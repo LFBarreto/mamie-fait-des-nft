@@ -2,6 +2,8 @@ let { networkConfig } = require("../helper-hardhat-config");
 const fs = require("fs");
 const path = require("path");
 
+const data = require("../contractData/lilHackerz");
+
 module.exports = async ({ getNamedAccounts, deployments, getChainId }) => {
   const { deploy, log } = deployments;
   const { deployer } = await getNamedAccounts();
@@ -12,6 +14,15 @@ module.exports = async ({ getNamedAccounts, deployments, getChainId }) => {
   const SVGPixels = await deploy("SVGPixels", {
     from: deployer,
     log: true,
+    gasLimit: 25000000,
+    gasPrice: 40000000000,
+  });
+
+  const LilHackerzMetaData = await deploy("LilHackerzMetaData", {
+    from: deployer,
+    log: true,
+    gasLimit: 25000000,
+    gasPrice: 40000000000,
   });
 
   const p0 = `<style>rect {stroke-width: 0;} @keyframes slideRight {0,100% {transform: translateX(0);} 50% {transform: translateX(10px);}} @keyframes slideLeft {0%,100% {transform: translateX(0);} 50% {transform: translateX(-10px);}} @keyframes slideBottom {0%,100% {transform: translateY(0);} 50% {transform: translateY(10px);}} @keyframes slideTop {0%,100% {transform: translateY(0);} 50% {transform: translateY(-10px);}} @keyframes slideSideToSide {0%,    50%,100% {transform: translateX(0);}    25% {transform: translateX(10px);}    75% {transform: translateX(-10px);}} @keyframes slideSideToSideVertical {0%,    50%,100% {transform: translateY(0);}    25% {transform: translateY(10px);}    75% {transform: translateY(-10px);}} @keyframes blink {0%,100% {  opacity: 1;} 50% {  opacity: 0;}}  .c-1 {animation: slideLeft 1s steps(1) infinite alternate;}.c-2 {animation: slideRight 1s steps(1) infinite;}.c-3 {animation: slideSideToSide 4s steps(1) infinite;}.c-4 {animation: slideBottom 1s steps(1) infinite;}.c-5 {animation: slideTop 1s steps(1) infinite;}.c-6 {animation: slideSideToSideVertical 2s steps(1) infinite;}.c-7 {animation: blink 1s steps(1) infinite;} .c-8 {animation: blink 1s steps(1) infinite reverse;}</style>`;
@@ -24,8 +35,15 @@ module.exports = async ({ getNamedAccounts, deployments, getChainId }) => {
     libraries: {
       SVGPixels: SVGPixels.address,
     },
+    gasLimit: 25000000,
+    gasPrice: 40000000000,
   });
   log(`You have deployed an NFT contract to ${LilHackerz.address}`);
+
+  const lilHackerzMetadataContract = await ethers.getContractFactory(
+    "LilHackerzMetaData",
+    {}
+  );
 
   const lilHackerzContract = await ethers.getContractFactory("LilHackerz", {
     libraries: {
@@ -41,27 +59,55 @@ module.exports = async ({ getNamedAccounts, deployments, getChainId }) => {
   );
   const networkName = networkConfig[chainId]["name"];
 
+  const lilHackerzMetaData = new ethers.Contract(
+    LilHackerzMetaData.address,
+    lilHackerzMetadataContract.interface,
+    signer
+  );
+
+  log(
+    `Verify with:\n npx hardhat verify --network ${networkName} ${SVGPixels.address}`
+  );
+  log(
+    `Verify with:\n npx hardhat verify --network ${networkName} ${LilHackerzMetaData.address}`
+  );
   log(
     `Verify with:\n npx hardhat verify --network ${networkName} ${LilHackerz.address}`
   );
 
   log(`Now let's mint some...`);
 
-  await lilHackerz._setSvgParts(p0, p1);
+  await lilHackerz._setMetadataContract(LilHackerzMetaData.address);
 
-  await lilHackerz._addHeads([[]]);
+  await lilHackerzMetaData._setDescription(data.description);
 
-  await lilHackerz._addHairs([[]]);
+  await lilHackerzMetaData._setWebBaseLink(data.website_base);
 
-  await lilHackerz._addEyes([[]]);
+  await lilHackerzMetaData._setSvgParts(p0, p1);
 
-  await lilHackerz._addMouths([[]]);
+  await lilHackerzMetaData._addHeads(data.heads, data.heads_traits);
 
-  await lilHackerz._addHats([[]]);
+  await lilHackerzMetaData._addHairs(data.hairs, data.hairs_traits);
 
-  await lilHackerz._addAccessories([[]]);
+  await lilHackerzMetaData._addEyes(data.eyes, data.eyes_traits);
 
-  const nbToMint = 32;
+  await lilHackerzMetaData._addMouths(data.mouths, data.mouths_traits);
+
+  await lilHackerzMetaData._addHats(data.hats, data.hats_traits);
+
+  await lilHackerzMetaData._addAccessories(
+    data.accessories,
+    data.accessories_traits
+  );
+
+  const nbToMint = Math.max(
+    data.heads.length,
+    data.hairs.length,
+    data.eyes.length,
+    data.mouths.length,
+    data.hats.length,
+    data.accessories.length
+  );
 
   for (let i = 0; i < nbToMint; i++) {
     let tx = await lilHackerz.mint();
